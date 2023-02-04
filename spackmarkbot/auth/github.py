@@ -2,8 +2,8 @@
 # Spack Project Developers. See the top-level COPYRIGHT file for details.
 #
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
-
 import os
+import re
 import time
 
 import aiohttp
@@ -12,14 +12,15 @@ from aiohttp import web
 from gidgethub import aiohttp as gh_aiohttp
 
 # get config from environment.
-REQUESTER = os.environ.get("SMB_GH_REQUESTER")
-PRIVATE_KEY_PATH = os.environ.get("SMB_GH_PRIVATE_KEY_PATH")
-APP_IDENTIFIER = os.environ.get("SMB_GH_APP_IDENTIFIER")
+GH_REPO = os.environ.get("SMB_GH_REPO")
+GH_REQUESTER = os.environ.get("SMB_GH_REQUESTER")
+GH_PRIVATE_KEY_PATH = os.environ.get("SMB_GH_PRIVATE_KEY_PATH")
+GH_APP_IDENTIFIER = os.environ.get("SMB_GH_APP_IDENTIFIER")
 
 # load private key from file if provided.
-if os.path.exists(PRIVATE_KEY_PATH):
-    with open(PRIVATE_KEY_PATH, "r") as handle:
-        PRIVATE_KEY = handle.read()
+if os.path.exists(GH_PRIVATE_KEY_PATH):
+    with open(GH_PRIVATE_KEY_PATH, "r") as handle:
+        GH_PRIVATE_KEY = handle.read()
 
 #: location for authenticated app to get a token for one of its installations
 INSTALLATION_TOKEN_URL = "app/installations/{installation_id}/access_tokens"
@@ -58,7 +59,7 @@ async def authenticate_installation(installation_id):
 
     async def renew_installation_token():
         async with aiohttp.ClientSession() as session:
-            gh = gh_aiohttp.GitHubAPI(session, REQUESTER)
+            gh = gh_aiohttp.GitHubAPI(session, GH_REQUESTER)
 
             # Use the JWT to get a limited-life OAuth token for a particular
             # installation of the app. Note that we get a JWT only when
@@ -93,9 +94,39 @@ async def get_jwt():
         # private key. You need the app id and the private key, and you can
         # use this gidgethub method to create the JWT.
         now = time.time()
-        jwt = gha.get_jwt(app_id=APP_IDENTIFIER, private_key=PRIVATE_KEY)
+        jwt = gha.get_jwt(app_id=GH_APP_IDENTIFIER, private_key=GH_PRIVATE_KEY)
 
         # gidgethub JWT's expire after 10 minutes (you cannot change it)
         return (now + 10 * 60), jwt
 
     return await _tokens.get_token("JWT", renew_jwt)
+
+
+class IDStore:
+    def __init__(self):
+        self.id = None
+        self.owner = re.search("(?<=\:)[^\/]*", GH_REPO, re.IGNORECASE).group()
+        self.repo = re.search("(?<=\/)[^.]*", GH_REPO, re.IGNORECASE).group()
+
+    async def get_id(self):
+        if self.id is None:
+            async with aiohttp.ClientSession() as session:
+                gh = gh_aiohttp.GitHubAPI(session, GH_REQUESTER)
+
+                result = await gh.getitem(
+                    f"/repos/{self.owner}/{self.repo}/installation",
+                    accept="application/vnd.github+json",
+                    jwt=await get_jwt(),
+                )
+
+                self.id = result["id"]
+
+        return self.id
+
+
+_id_store = IDStore()
+
+
+async def get_installation_id():
+    """Get an installation ID that has access to the given repo url."""
+    return await _id_store.get_id()

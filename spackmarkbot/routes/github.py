@@ -2,14 +2,13 @@
 # Spack Project Developers. See the top-level COPYRIGHT file for details.
 #
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
-
 import asyncio
 from typing import Any
 
 from gidgethub import routing
 from gidgethub import sansio
 
-from .utils import git
+from ..utils.git import git
 
 
 class SpackmarkRouter(routing.Router):
@@ -36,14 +35,8 @@ router = SpackmarkRouter()
 repo_lock = asyncio.Lock()
 
 
-# @router.register("pull_request", action="opened")
-# async def opened_pr(event, gh, *arg, **kwargs):
-#     """Mark new PRs as needing a review."""
-#     pull_request = event.data["pull_request"]
-#     await gh.post(pull_request["issue_url"] + "/labels", data=["needs review"])
-
-
 @router.register("pull_request", action="opened")
+@router.register("pull_request", action="synchronize")
 async def sync_pr(event, gh, *arg, **kwargs):
     """Sync the git fork/branch referenced in a PR to GitLab."""
     pull_request = event.data["pull_request"]
