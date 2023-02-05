@@ -13,6 +13,7 @@ from aiohttp import web
 
 from .github import github
 from .gitlab import gitlab
+from .utils.git import git
 
 # Get configuration from environment
 GIT_REPO_PATH = os.environ.get("SMB_GIT_REPO_PATH")

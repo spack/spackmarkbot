@@ -17,7 +17,6 @@ from gidgethub import sansio
 from .auth.github import authenticate_installation
 from .auth.github import get_installation_id
 from .routes.github import router
-from .utils.git import git
 
 # Get configuration from environment
 GH_SECRET = os.environ.get("SMB_GH_SECRET")
