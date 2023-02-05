@@ -25,9 +25,9 @@ PORT = os.environ.get("SMB_PORT")
 async def main(request):
     # route request to github or gitlab submodule based on event type header
     if "x-github-event" in request.headers:
-        await github(request)
+        return await github(request)
     elif "x-gitlab-event" in request.headers:
-        await gitlab(request)
+        return await gitlab(request)
     else:
         return web.Response(status=404)
 
