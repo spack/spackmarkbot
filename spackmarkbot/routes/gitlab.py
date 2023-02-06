@@ -67,7 +67,10 @@ async def opened_issue(event, gh, gl, *arg, **kwargs):
     ci_status = event.data["object_attributes"]["status"]
 
     # construct upload payload
-    payload = {"name": GH_CHECK_NAME, "head_sha": ref}
+    payload = {
+        "name": GH_CHECK_NAME,
+        "head_sha": ref,
+    }
 
     if ci_status == "pending":
         payload["status"] = "queued"

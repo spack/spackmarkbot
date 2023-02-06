@@ -36,6 +36,7 @@ repo_lock = asyncio.Lock()
 
 
 @router.register("pull_request", action="opened")
+@router.register("pull_request", action="reopened")
 @router.register("pull_request", action="synchronize")
 async def sync_pr(event, gh, *arg, **kwargs):
     """Sync the git fork/branch referenced in a PR to GitLab."""
@@ -45,5 +46,15 @@ async def sync_pr(event, gh, *arg, **kwargs):
     try:
         git(f"fetch github pull/{pull_request_id}/head")
         git(f"push gitlab FETCH_HEAD:refs/heads/pr-{pull_request_id}")
+    finally:
+        repo_lock.release()
+
+@router.register("pull_request", action="closed")
+async def remove_pr(event, gh, *arg, **kwargs):
+    pull_request = event.data["pull_request"]
+    pull_request_id = pull_request["number"]
+    await repo_lock.acquire()
+    try:
+        git(f"push -d gitlab refs/heads/pr-{pull_request_id}")
     finally:
         repo_lock.release()
