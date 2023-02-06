@@ -57,7 +57,7 @@ repo = re.search("(?<=\/)[^.]*", GH_REPO, re.IGNORECASE).group()
 @router.register("Pipeline Hook", status="pending")
 @router.register("Pipeline Hook", status="running")
 @router.register("Pipeline Hook", status="success")
-@router.register("Pipeline Hook", status="failed")
+@router.register("Pipeline Hook", status="failure")
 async def opened_issue(event, gh, gl, *arg, **kwargs):
     """Relay status of a GitLab pipeline back to GitHub."""
     # get ref from event
@@ -88,15 +88,17 @@ async def opened_issue(event, gh, gl, *arg, **kwargs):
     data = await gh.getitem(url)
 
     # search for existing check with GH_CHECK_NAME
-    check_id = None
+    existing_check = None
     for check in data["check_runs"]:
         if check["name"] == GH_CHECK_NAME:
-            check_id = check["id"]
+            existing_check = check
             break
 
-    if check_id is None:
+    # create a new check if no previous check is found, or if the previous
+    # existing check was marked as completed. (This allows to check re-runs.)
+    if existing_check is None or existing_check["status"] == "completed":
         url = f"/repos/{owner}/{repo}/check-runs"
         await gh.post(url, data=payload)
     else:
-        url = f"/repos/{owner}/{repo}/check-runs/{check_id}"
+        url = f"/repos/{owner}/{repo}/check-runs/{existing_check['id']}"
         await gh.patch(url, data=payload)
